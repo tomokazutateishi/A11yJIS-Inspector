@@ -1,0 +1,10 @@
+{
+  "contrast": "JIS8341-3: WCAG 1.4.3 / 1.4.11 準拠（AA）",
+  "altText": "JIS8341-3: 1.1.1 非テキストコンテンツ",
+  "touchTarget": "JIS8341-3: 2.5.5 ターゲットのサイズ（参考）/ JIS附属書 国内運用注記（ダミー）",
+  "meta": {
+    "jisVersion": "JIS X 8341-3:2016（ダミー）",
+    "wcagVersion": "WCAG 2.1（ダミー）"
+  }
+}
+

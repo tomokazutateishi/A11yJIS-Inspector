@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <title>A11yJIS Inspector</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        --bg: #0f172a;
+        --panel: #111827;
+        --text: #e5e7eb;
+        --muted: #9ca3af;
+        --accent: #60a5fa;
+        --bad: #f87171;
+        --warn: #fbbf24;
+        --good: #34d399;
+      }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Noto Sans,
+          Ubuntu, Cantarell, Helvetica Neue, Arial, 'Apple Color Emoji', 'Segoe UI Emoji';
+        background: var(--bg);
+        color: var(--text);
+      }
+      header {
+        padding: 10px 12px;
+        border-bottom: 1px solid #1f2937;
+        background: var(--panel);
+        font-weight: 600;
+      }
+      .wrap {
+        padding: 12px;
+        display: grid;
+        gap: 10px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+      .card {
+        background: #0b1220;
+        border: 1px solid #1f2937;
+        padding: 8px;
+        border-radius: 8px;
+      }
+      .kpi {
+        font-size: 20px;
+        font-weight: 700;
+      }
+      .muted {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 10px;
+        border-radius: 6px;
+        border: 1px solid #1f2937;
+        background: #101826;
+        color: var(--text);
+        cursor: pointer;
+      }
+      .btn:hover {
+        background: #0f1828;
+        border-color: #2a364a;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+      }
+      input[type='text'] {
+        background: #0b1220;
+        color: var(--text);
+        border: 1px solid #1f2937;
+        border-radius: 6px;
+        padding: 8px;
+        width: 100%;
+      }
+      a {
+        color: var(--accent);
+        text-decoration: none;
+      }
+      a:hover {
+        text-decoration: underline;
+      }
+      .legend {
+        font-size: 12px;
+        line-height: 1.4;
+      }
+      .counts {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 6px;
+        font-size: 12px;
+      }
+      .counts div {
+        background: #0b1220;
+        border: 1px solid #1f2937;
+        border-radius: 6px;
+        padding: 6px;
+      }
+      .err {
+        color: var(--bad);
+      }
+      .warn {
+        color: var(--warn);
+      }
+      .ok {
+        color: var(--good);
+      }
+      footer {
+        padding: 8px 12px;
+        border-top: 1px solid #1f2937;
+        color: var(--muted);
+        font-size: 11px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>A11yJIS Inspector</header>
+    <div class="wrap">
+      <div class="row">
+        <input id="inspector" type="text" placeholder="検査者名（例：山田 太郎）" />
+        <button id="btn-run" class="btn">再検査</button>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <div class="muted">対象ノード数</div>
+          <div id="kpi-count" class="kpi">-</div>
+        </div>
+        <div class="card">
+          <div class="muted">検出件数（error）</div>
+          <div id="kpi-errors" class="kpi err">-</div>
+        </div>
+        <div class="card">
+          <div class="muted">検出件数（warning）</div>
+          <div id="kpi-warns" class="kpi warn">-</div>
+        </div>
+      </div>
+
+      <div class="counts">
+        <div>contrast: <span id="cnt-contrast">-</span></div>
+        <div>altText: <span id="cnt-alt">-</span></div>
+        <div>touchTarget: <span id="cnt-touch">-</span></div>
+      </div>
+
+      <div class="row">
+        <button id="btn-csv" class="btn">CSV出力</button>
+        <button id="btn-md" class="btn">Markdown出力</button>
+        <button id="btn-audit" class="btn">監査ログ出力</button>
+      </div>
+
+      <div class="card legend">
+        <div>JIS条項マッピング（初期ダミー）</div>
+        <ul>
+          <li>
+            contrast → JIS8341-3: WCAG 1.4.3 / 1.4.11 準拠（AA）
+          </li>
+          <li>altText → JIS8341-3: 1.1.1 非テキストコンテンツ</li>
+          <li>
+            touchTarget → JIS8341-3: 2.5.5 ターゲットのサイズ（参考）/ JIS附属書 国内運用注記（ダミー）
+          </li>
+        </ul>
+        <a id="link-clause" href="#" target="_blank" rel="noreferrer">JIS/WCAG条項の凡例（外部リンク・ダミー）</a>
+      </div>
+
+      <div id="warnings" class="muted"></div>
+    </div>
+    <footer>© A11yJIS Inspector v0.1 PoC</footer>
+
+    <script type="module" src="./dist/ui.js"></script>
+  </body>
+  </html>
+

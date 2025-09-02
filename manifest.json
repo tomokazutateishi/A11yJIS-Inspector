@@ -1,0 +1,10 @@
+{
+  "name": "A11yJIS Inspector",
+  "id": "a11yjis-inspector",
+  "api": "1.0.0",
+  "editorType": ["figma"],
+  "main": "dist/code.js",
+  "ui": "ui.html",
+  "permissions": []
+}
+
