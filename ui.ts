@@ -125,7 +125,7 @@ function toMarkdown(payload: ExportPayload) {
     .join('\n');
 
   return [
-    '# A11yJIS Inspector Report',
+    '# JIS準拠チェッカーレポート',
     `- 検査日時: ${human}`,
     `- 検査者: ${inspector || 'n/a'}`,
     `- 対象ファイル: ${summary.fileKey || 'n/a'} / ページ: ${summary.pageName || '-'}`,
@@ -145,7 +145,7 @@ function toMarkdown(payload: ExportPayload) {
     '',
     '## 検査環境',
     `- Figmaバージョン: n/a`,
-    `- プラグイン: A11yJIS Inspector v0.1`
+    `- プラグイン: JIS準拠チェッカー v0.1`
   ].join('\n');
 }
 
@@ -201,14 +201,14 @@ $('#btn-csv').addEventListener('click', () => {
   if (!latestPayload) return;
   const { stamp } = now();
   const csv = toCsv(latestPayload.rows);
-  download(`exports/a11yjis_report_${stamp}.csv`, csv, 'text/csv');
+  download(`exports/jis_checker_report_${stamp}.csv`, csv, 'text/csv');
 });
 
 $('#btn-md').addEventListener('click', () => {
   if (!latestPayload) return;
   const { stamp } = now();
   const md = toMarkdown({ ...latestPayload, inspector: inspectorInput.value.trim() });
-  download(`exports/a11yjis_report_${stamp}.md`, md, 'text/markdown');
+  download(`exports/jis_checker_report_${stamp}.md`, md, 'text/markdown');
 });
 
 $('#btn-audit').addEventListener('click', () => {
@@ -225,4 +225,3 @@ $('#link-clause').addEventListener('click', (e) => {
   e.preventDefault();
   window.open('https://www.w3.org/TR/WCAG21/', '_blank', 'noreferrer');
 });
-

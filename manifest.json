@@ -1,5 +1,5 @@
 {
-  "name": "A11yJIS Inspector",
+  "name": "JIS準拠チェッカー",
   "id": "a11yjis-inspector",
   "api": "1.0.0",
   "editorType": ["figma"],
@@ -7,4 +7,3 @@
   "ui": "ui.html",
   "permissions": []
 }
-
