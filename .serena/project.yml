@@ -1,3 +1,4 @@
+
 # language of the project (csharp, python, rust, java, typescript, go, cpp, or ruby)
 #  * For C, use cpp
 #  * For JavaScript, use typescript
@@ -65,4 +66,4 @@ excluded_tools: []
 # (contrary to the memories, which are loaded on demand).
 initial_prompt: ""
 
-project_name: "A11yJIS-Inspector"
+project_name: "A11yJIS Inspector"

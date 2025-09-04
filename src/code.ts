@@ -9,9 +9,15 @@
  * - 監査ログはUI側でダウンロード
  */
 
-import { analyzeSelection } from './utils/ruleEngine';
-import type { IssueRow, Summary } from './utils/types';
 import jisMapping from './rules/jis_mapping.json';
+import { analyzeSelection } from './utils/ruleEngine';
+import type { Summary } from './utils/types';
+
+// UIからのメッセージの型定義
+type UiMessage = {
+  type: 'reinspect';
+  inspector: string;
+};
 
 function showUI() {
   figma.showUI(__html__, { width: 380, height: 460, themeColors: true });
@@ -21,10 +27,10 @@ function warnUI(message: string) {
   figma.ui.postMessage({ type: 'warning', message });
 }
 
-async function runInspection(inspector?: string) {
+function runInspection(inspector?: string) {
   // 対象：選択フレーム配下のノード
   const selection = figma.currentPage.selection;
-  const frames = selection.filter((n) => n.type === 'FRAME') as FrameNode[];
+  const frames = selection.filter((n) => n.type === 'FRAME');
 
   if (frames.length === 0) {
     warnUI('フレームを1つ以上選択してください。');
@@ -32,7 +38,7 @@ async function runInspection(inspector?: string) {
   }
 
   try {
-    const { rows, nodeCount, perType, errorCount, warnCount, frameName } = await analyzeSelection(
+    const { rows, nodeCount, perType, errorCount, warnCount, frameName } = analyzeSelection(
       frames,
       jisMapping
     );
@@ -52,7 +58,7 @@ async function runInspection(inspector?: string) {
     };
 
     const payload = {
-      rows: rows as IssueRow[],
+      rows: rows,
       summary,
       inspector: inspector || ''
     };
@@ -67,12 +73,14 @@ async function runInspection(inspector?: string) {
 figma.on('run', () => {
   showUI();
   // 初回自動実行
-  runInspection();
+  void runInspection();
 });
 
-figma.ui.onmessage = (msg: any) => {
+figma.ui.onmessage = (msg: UiMessage) => {
+  // ここでUIからのメッセージを受信
+  console.log('[MAIN] onmessage', msg);
   if (msg.type === 'reinspect') {
-    runInspection(msg.inspector);
+    console.log('[MAIN] reinpect requested', { inspector: msg.inspector });
+    void runInspection(msg.inspector);
   }
 };
-

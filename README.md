@@ -7,7 +7,7 @@
   - タッチターゲット（最小44×44px）
 - レポート：CSV/Markdown（UIからダウンロード）
 - 監査ログ：`exports/audit_log_YYYYMMDD_HHMM.json`（UIからダウンロード）
-- JISマッピング：`/rules/jis_mapping.json`（差し替え可能）
+- JISマッピング：`/src/rules/jis_mapping.json`（差し替え可能）
 
 ## I/O仕様（例示）
 
@@ -25,9 +25,27 @@
 ## 開発手順
 
 1. 依存インストール：`npm install`
-2. ビルド：`npm run build`（`dist/code.js` と `dist/ui.js` を生成）
-3. Figma デスクトップアプリで「開発プラグインをインポート」から本ディレクトリの `manifest.json` を指定
+2. ビルド：`npm run build`（`dist/code.js`・`dist/ui.js`・`dist/ui.html` を生成）
+3. Figma デスクトップアプリで「開発プラグインをインポート」から本ディレクトリの `manifest.json` を指定（`main: dist/code.js` / `ui: dist/ui.html`）
 4. フレームを選択してプラグイン実行 → UI右パネルのKPIと出力ボタンを確認
+
+## ディレクトリ構成（整理後）
+
+```
+src/
+  code.ts           # メイン（Figma Plugin main）
+  utils/            # 共通ユーティリティ
+  rules/            # ルール/マッピング（JSON等）
+  ui/
+    ui.ts           # UIロジック（ブラウザ側）
+    ui.html         # UIテンプレート（ビルドで dist/ にコピー）
+dist/
+  code.js
+  ui.js
+  ui.html
+```
+
+開発中に `ui.html` を変更した場合、`watch` は TypeScript のみ監視しています。HTML の変更を反映するには `npm run build` を再実行してください。
 
 ## 実装メモ
 

@@ -1,10 +1,10 @@
 {
   "compilerOptions": {
-    "target": "ES2018",
+    "target": "ES2021",
     "module": "ESNext",
-    "lib": ["ES2018", "DOM"],
+    "lib": ["ES2021", "DOM"],
     "moduleResolution": "Bundler",
-    "types": ["@figma/plugin-typings", "node"],
+    "types": ["@figma/plugin-typings"],
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
@@ -12,7 +12,6 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["**/*.ts", "**/*.tsx", "rules/*.json", "ui.html"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/rules/*.json", "src/ui/ui.html"],
   "exclude": ["dist/**", "node_modules/**"]
 }
-

@@ -1,0 +1,5 @@
+# バックアップファイルを無視
+*.bak
+node_modules/
+dist/
+.DS_Store

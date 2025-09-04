@@ -6,23 +6,35 @@
  * 例外はクラッシュさせず、warningとして報告します。
  */
 
-import { Rule, RuleResult, RuleType } from './types';
-import { isColorSimilar } from './color';
+import { firstSolidFromFills, estimateBackgroundRGB, contrastRatio } from './color';
 
 function isTextNode(n: SceneNode): n is TextNode {
   return n.type === 'TEXT';
 }
 
-function isComponentOrSet(n: SceneNode): n is ComponentNode | ComponentSetNode {
-  return n.type === 'COMPONENT' || n.type === 'COMPONENT_SET';
-}
-
 export function getNodeDescriptionSafe(node: SceneNode): string | undefined {
-  if (isComponentOrSet(node)) {
-    return node.description ?? undefined;
-  }
+  // 1) まず、ネイティブな description（存在する全ノード型で優先）
+  // 型上は存在しない型もあるため、安全にアクセス
+  const nativeDesc = (() => {
+    const maybeObj = node as unknown;
+    if (maybeObj && typeof maybeObj === 'object') {
+      const val = (maybeObj as Record<string, unknown>)['description'];
+      if (typeof val === 'string') {
+        const trimmed = val.trim();
+        if (trimmed.length > 0) return trimmed;
+      }
+    }
+    return undefined;
+  })();
+  if (nativeDesc) return nativeDesc;
+
+  // 2) ネイティブが空/未定義なら、プラグインデータをフォールバック
   const pd = node.getPluginData?.('description');
-  return pd || undefined;
+  if (typeof pd === 'string') {
+    const trimmed = pd.trim();
+    if (trimmed.length > 0) return trimmed;
+  }
+  return undefined;
 }
 import type { AnalyzeResult, IssueRow, JISMapping } from './types';
 

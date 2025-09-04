@@ -1,76 +1,67 @@
 "use strict";
 (() => {
-  // utils/color.ts
-  function relativeLuminance(rgb) {
-    const srgb = [rgb.r, rgb.g, rgb.b].map((v) => {
-      const c = clamp01(v);
-      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-    });
-    return 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
-  }
-  function contrastRatio(fg, bg) {
-    const L1 = relativeLuminance(fg);
-    const L2 = relativeLuminance(bg);
-    const [a, b] = L1 > L2 ? [L1, L2] : [L2, L1];
-    return (a + 0.05) / (b + 0.05);
-  }
-  function clamp01(v) {
-    return Math.max(0, Math.min(1, v));
-  }
-  function solidPaintToRGB(paint) {
-    var _a;
-    if (paint.type !== "SOLID" || paint.visible === false) return null;
-    const { r, g, b } = paint.color;
-    const opacity = (_a = paint.opacity) != null ? _a : 1;
-    return { r: r * opacity + (1 - opacity), g: g * opacity + (1 - opacity), b: b * opacity + (1 - opacity) };
-  }
-  function firstSolidFromFills(node) {
-    const fills = node.fills;
-    if (fills === figma.mixed || !fills || !Array.isArray(fills)) return null;
-    for (const p of fills) {
-      if (p.type === "SOLID" && p.visible !== false) {
-        return solidPaintToRGB(p);
-      }
+  // src/rules/jis_mapping.json
+  var jis_mapping_default = {
+    contrast: "JIS8341-3: WCAG 1.4.3 / 1.4.11 \u6E96\u62E0\uFF08AA\uFF09",
+    altText: "JIS8341-3: 1.1.1 \u975E\u30C6\u30AD\u30B9\u30C8\u30B3\u30F3\u30C6\u30F3\u30C4",
+    touchTarget: "JIS8341-3: 2.5.5 \u30BF\u30FC\u30B2\u30C3\u30C8\u306E\u30B5\u30A4\u30BA\uFF08\u53C2\u8003\uFF09/ JIS\u9644\u5C5E\u66F8 \u56FD\u5185\u904B\u7528\u6CE8\u8A18\uFF08\u30C0\u30DF\u30FC\uFF09",
+    meta: {
+      jisVersion: "JIS X 8341-3:2016\uFF08\u30C0\u30DF\u30FC\uFF09",
+      wcagVersion: "WCAG 2.1\uFF08\u30C0\u30DF\u30FC\uFF09"
     }
-    return null;
-  }
-  function estimateBackgroundRGB(node) {
-    let current = node.parent;
-    while (current && current.type !== "PAGE") {
-      const geom = current;
-      if (geom.fills && geom.fills !== figma.mixed && Array.isArray(geom.fills)) {
-        for (const p of geom.fills) {
-          if (p.type === "SOLID" && p.visible !== false) {
-            const rgb = solidPaintToRGB(p);
-            if (rgb) return { rgb, source: `parent:${current.name}` };
-          }
-        }
-      }
-      current = current.parent;
-    }
-    return { rgb: { r: 1, g: 1, b: 1 }, source: "default:white" };
-  }
+  };
 
-  // utils/ruleEngine.ts
+  // src/utils/ruleEngine.ts
+  function isTextNode(n) {
+    return n.type === "TEXT";
+  }
+  function isComponentOrSet(n) {
+    return n.type === "COMPONENT" || n.type === "COMPONENT_SET";
+  }
+  function getNodeDescriptionSafe(node) {
+    var _a, _b;
+    if (isComponentOrSet(node)) {
+      return (_a = node.description) != null ? _a : void 0;
+    }
+    const pd = (_b = node.getPluginData) == null ? void 0 : _b.call(node, "description");
+    return pd || void 0;
+  }
   function ts() {
     return (/* @__PURE__ */ new Date()).toISOString();
   }
+  function hasFills(node) {
+    return "fills" in node;
+  }
+  function isLayoutable(node) {
+    return "width" in node && "height" in node;
+  }
   function isImageLike(node) {
-    const geom = node;
-    if (geom.fills && geom.fills !== figma.mixed && Array.isArray(geom.fills)) {
-      return geom.fills.some((p) => p.type === "IMAGE");
+    if (hasFills(node)) {
+      const fills = node.fills;
+      if (fills && fills !== figma.mixed && Array.isArray(fills)) {
+        return fills.some((p) => p.type === "IMAGE");
+      }
     }
-    return node.type === "RECTANGLE" || node.type === "ELLIPSE" || node.type === "POLYGON" || node.type === "STAR";
+    return false;
   }
   function collectNodesWithin(frames) {
     const nodes = [];
+    const allowedTypes = /* @__PURE__ */ new Set([
+      "TEXT",
+      "FRAME",
+      "GROUP",
+      "VECTOR",
+      "RECTANGLE",
+      "ELLIPSE",
+      "POLYGON",
+      "STAR",
+      "INSTANCE",
+      "COMPONENT",
+      "COMPONENT_SET"
+    ]);
     for (const f of frames) {
-      f.findAll((n) => {
-        if (n.type === "TEXT" || n.type === "FRAME" || n.type === "GROUP" || n.type === "VECTOR" || n.type === "RECTANGLE" || n.type === "ELLIPSE" || n.type === "POLYGON" || n.type === "STAR" || n.type === "INSTANCE" || n.type === "COMPONENT" || n.type === "COMPONENT_SET") {
-          nodes.push(n);
-        }
-        return false;
-      });
+      const found = f.findAll((n) => allowedTypes.has(n.type));
+      nodes.push(...found);
     }
     return nodes;
   }
@@ -78,6 +69,7 @@
     return 4.5;
   }
   function checkContrast(node, frameName, map) {
+    if (!hasFills(node) && !isTextNode(node)) return null;
     const fg = firstSolidFromFills(node);
     const bgEst = estimateBackgroundRGB(node);
     if (!fg) {
@@ -111,27 +103,28 @@
     return null;
   }
   function checkAltText(node, frameName, map) {
+    var _a;
     if (!(node.type === "VECTOR" || isImageLike(node))) return null;
-    const desc = node.description || "";
-    if (desc.trim().length === 0) {
-      return {
-        timestamp: ts(),
-        frameName,
-        nodeId: node.id,
-        nodeName: node.name,
-        issueType: "altText",
-        severity: "error",
-        details: "\u4EE3\u66FF\u30C6\u30AD\u30B9\u30C8\uFF08description\uFF09\u304C\u672A\u8A2D\u5B9A\u3067\u3059\u3002",
-        suggestedFix: "\u30CE\u30FC\u30C9\u306Edescription\u306B\u5185\u5BB9\u3092\u8981\u7D04\u3057\u305F\u4EE3\u66FF\u30C6\u30AD\u30B9\u30C8\u3092\u8A2D\u5B9A\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
-        JISClauseId: map.altText
-      };
+    const desc = (_a = getNodeDescriptionSafe(node)) != null ? _a : "";
+    if (desc.length > 0) {
+      return null;
     }
-    return null;
+    return {
+      timestamp: ts(),
+      frameName,
+      nodeId: node.id,
+      nodeName: node.name,
+      issueType: "altText",
+      severity: "error",
+      details: "\u4EE3\u66FF\u30C6\u30AD\u30B9\u30C8\uFF08description\uFF09\u304C\u672A\u8A2D\u5B9A\u3067\u3059\u3002",
+      suggestedFix: "\u30CE\u30FC\u30C9\u306Edescription\u306B\u5185\u5BB9\u3092\u8981\u7D04\u3057\u305F\u4EE3\u66FF\u30C6\u30AD\u30B9\u30C8\u3092\u8A2D\u5B9A\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
+      JISClauseId: map.altText
+    };
   }
   function checkTouchTarget(node, frameName, map) {
+    if (!isLayoutable(node)) return null;
     const w = node.width;
     const h = node.height;
-    if (typeof w !== "number" || typeof h !== "number") return null;
     if (w < 44 || h < 44) {
       return {
         timestamp: ts(),
@@ -147,17 +140,22 @@
     }
     return null;
   }
-  async function analyzeSelection(frames, jisMap) {
+  function analyzeSelection(frames, jisMap) {
     const nodes = collectNodesWithin(frames);
     const rows = [];
     let errorCount = 0;
     let warnCount = 0;
     const perType = { contrast: 0, altText: 0, touchTarget: 0 };
     const frameName = frames.length === 1 ? frames[0].name : `${frames.length} frames`;
+    const rules = [
+      { fn: checkContrast, type: "contrast", jisKey: "contrast" },
+      { fn: checkAltText, type: "altText", jisKey: "altText" },
+      { fn: checkTouchTarget, type: "touchTarget", jisKey: "touchTarget" }
+    ];
     for (const n of nodes) {
-      for (const rule of [checkContrast, checkAltText, checkTouchTarget]) {
+      for (const { fn, type, jisKey } of rules) {
         try {
-          const issue = rule(n, frameName, jisMap);
+          const issue = fn(n, frameName, jisMap);
           if (issue) {
             rows.push(issue);
             perType[issue.issueType] = (perType[issue.issueType] || 0) + 1;
@@ -170,11 +168,11 @@
             frameName,
             nodeId: n.id,
             nodeName: n.name,
-            issueType: "contrast",
+            issueType: type,
             severity: "warning",
             details: `\u30EB\u30FC\u30EB\u8A55\u4FA1\u4E2D\u306B\u4F8B\u5916: ${e.message}`,
             suggestedFix: "\u5BFE\u8C61\u30CE\u30FC\u30C9\u306E\u5857\u308A/\u30B5\u30A4\u30BA/description\u3092\u78BA\u8A8D\u3057\u3066\u304F\u3060\u3055\u3044\u3002",
-            JISClauseId: jisMap.contrast
+            JISClauseId: jisMap[jisKey] || jisMap.contrast
           });
           warnCount++;
         }
@@ -190,25 +188,14 @@
     };
   }
 
-  // rules/jis_mapping.json
-  var jis_mapping_default = {
-    contrast: "JIS8341-3: WCAG 1.4.3 / 1.4.11 \u6E96\u62E0\uFF08AA\uFF09",
-    altText: "JIS8341-3: 1.1.1 \u975E\u30C6\u30AD\u30B9\u30C8\u30B3\u30F3\u30C6\u30F3\u30C4",
-    touchTarget: "JIS8341-3: 2.5.5 \u30BF\u30FC\u30B2\u30C3\u30C8\u306E\u30B5\u30A4\u30BA\uFF08\u53C2\u8003\uFF09/ JIS\u9644\u5C5E\u66F8 \u56FD\u5185\u904B\u7528\u6CE8\u8A18\uFF08\u30C0\u30DF\u30FC\uFF09",
-    meta: {
-      jisVersion: "JIS X 8341-3:2016\uFF08\u30C0\u30DF\u30FC\uFF09",
-      wcagVersion: "WCAG 2.1\uFF08\u30C0\u30DF\u30FC\uFF09"
-    }
-  };
-
-  // code.ts
+  // src/code.ts
   function showUI() {
     figma.showUI(__html__, { width: 380, height: 460, themeColors: true });
   }
   function warnUI(message) {
     figma.ui.postMessage({ type: "warning", message });
   }
-  async function runInspection(inspector) {
+  function runInspection(inspector) {
     const selection = figma.currentPage.selection;
     const frames = selection.filter((n) => n.type === "FRAME");
     if (frames.length === 0) {
@@ -216,7 +203,7 @@
       return;
     }
     try {
-      const { rows, nodeCount, perType, errorCount, warnCount, frameName } = await analyzeSelection(
+      const { rows, nodeCount, perType, errorCount, warnCount, frameName } = analyzeSelection(
         frames,
         jis_mapping_default
       );
@@ -246,11 +233,13 @@
   }
   figma.on("run", () => {
     showUI();
-    runInspection();
+    void runInspection();
   });
   figma.ui.onmessage = (msg) => {
+    console.log("[MAIN] onmessage", msg);
     if (msg.type === "reinspect") {
-      runInspection(msg.inspector);
+      console.log("[MAIN] reinpect requested", { inspector: msg.inspector });
+      void runInspection(msg.inspector);
     }
   };
 })();

@@ -40,14 +40,25 @@ export function solidPaintToRGB(paint: SolidPaint): { r: number; g: number; b: n
 export function firstSolidFromFills(
   node: GeometryMixin | TextNode
 ): { r: number; g: number; b: number } | null {
-  const fills = (node as any).fills as readonly Paint[] | PluginAPI['mixed'];
-  if (fills === figma.mixed || !fills || !Array.isArray(fills)) return null;
-  for (const p of fills) {
-    if (p.type === 'SOLID' && p.visible !== false) {
-      return solidPaintToRGB(p as SolidPaint);
+  if ('fills' in node) {
+    const fills = node.fills;
+    if (fills === figma.mixed || !fills || !Array.isArray(fills)) return null;
+
+    const solidPaint = fills.find(
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      (p): p is SolidPaint => p.type === 'SOLID' && p.visible !== false
+    );
+
+    if (solidPaint) {
+      return solidPaintToRGB(solidPaint);
     }
   }
   return null;
+}
+
+// 型ガード関数
+function hasFills(node: BaseNode): node is GeometryMixin & BaseNode {
+  return 'fills' in node;
 }
 
 /** 親の背景色（最初のSolid）を推定。なければ白 */
@@ -56,11 +67,15 @@ export function estimateBackgroundRGB(
 ): { rgb: { r: number; g: number; b: number }; source: string } {
   let current: BaseNode | null = node.parent;
   while (current && current.type !== 'PAGE') {
-    const geom = current as any as GeometryMixin;
-    if (geom.fills && geom.fills !== figma.mixed && Array.isArray(geom.fills)) {
-      for (const p of geom.fills as readonly Paint[]) {
-        if (p.type === 'SOLID' && p.visible !== false) {
-          const rgb = solidPaintToRGB(p as SolidPaint);
+    if (hasFills(current)) {
+      const fills = current.fills;
+      if (fills !== figma.mixed && Array.isArray(fills)) {
+        const solidPaint = fills.find(
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+          (p): p is SolidPaint => p.type === 'SOLID' && p.visible !== false
+        );
+        if (solidPaint) {
+          const rgb = solidPaintToRGB(solidPaint);
           if (rgb) return { rgb, source: `parent:${(current as SceneNode).name}` };
         }
       }
@@ -70,4 +85,3 @@ export function estimateBackgroundRGB(
   // fallback white（背景特定が困難な場合）
   return { rgb: { r: 1, g: 1, b: 1 }, source: 'default:white' };
 }
-
