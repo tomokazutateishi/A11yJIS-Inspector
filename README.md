@@ -1,12 +1,11 @@
-# JIS準拠チェッカー (v0.1 PoC)
+# A11yJIS Inspector (MVP)
 
 - Figma Plugin（Manifest v2）
 - 最小チェック：
   - 色コントラスト（WCAG 2.1/2.2 AA相当）
   - 代替テキスト（Image/Vectorに対するdescription有無）
   - タッチターゲット（最小44×44px）
-- レポート：CSV/Markdown（UIからダウンロード）
-- 監査ログ：`exports/audit_log_YYYYMMDD_HHMM.json`（UIからダウンロード）
+- レポート出力：MVPでは未実装（KPI表示のみ）
 - JISマッピング：`/src/rules/jis_mapping.json`（差し替え可能）
 
 ## I/O仕様（例示）
@@ -27,7 +26,7 @@
 1. 依存インストール：`npm install`
 2. ビルド：`npm run build`（`dist/code.js`・`dist/ui.js`・`dist/ui.html` を生成）
 3. Figma デスクトップアプリで「開発プラグインをインポート」から本ディレクトリの `manifest.json` を指定（`main: dist/code.js` / `ui: dist/ui.html`）
-4. フレームを選択してプラグイン実行 → UI右パネルのKPIと出力ボタンを確認
+4. フレームを選択してプラグイン実行 → UIで「検査実行」を押し、KPI（件数）を確認
 
 ## ディレクトリ構成（整理後）
 
@@ -37,7 +36,7 @@ src/
   utils/            # 共通ユーティリティ
   rules/            # ルール/マッピング（JSON等）
   ui/
-    ui.ts           # UIロジック（ブラウザ側）
+    ui.ts           # UIロジック（最小表示と再検査ボタン）
     ui.html         # UIテンプレート（ビルドで dist/ にコピー）
 dist/
   code.js

@@ -36,7 +36,7 @@ module.exports = {
       }
     }
   },
-  ignorePatterns: ['dist/**'],
+  ignorePatterns: ['dist/**', 'tmp_tests/**'],
   overrides: [
     // Node（ツール・設定ファイル）向け: Node 環境と Node 型を使用
     {
@@ -52,6 +52,25 @@ module.exports = {
       env: { node: true, browser: false },
       parserOptions: {
         project: './tsconfig.tools.json'
+      }
+    },
+    // テストコード向け: Node 環境 + 専用tsconfig
+    {
+      files: ['tests/**/*.ts'],
+      env: { node: true, browser: false },
+      parserOptions: {
+        project: './tsconfig.tests.json'
+      },
+      rules: {
+        '@typescript-eslint/no-explicit-any': 'off',
+        '@typescript-eslint/no-unsafe-assignment': 'off',
+        '@typescript-eslint/no-unsafe-member-access': 'off',
+        '@typescript-eslint/no-unsafe-call': 'off',
+        '@typescript-eslint/no-unsafe-argument': 'off',
+        '@typescript-eslint/no-unnecessary-type-assertion': 'off',
+        '@typescript-eslint/no-unsafe-return': 'off',
+        '@typescript-eslint/restrict-template-expressions': 'off',
+        'simple-import-sort/imports': 'off'
       }
     },
     // プラグイン（Figma ランタイム）向け: ブラウザ/DOM + Figma 型のみ

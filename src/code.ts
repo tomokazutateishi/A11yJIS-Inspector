@@ -14,13 +14,14 @@ import { analyzeSelection } from './utils/ruleEngine';
 import type { Summary } from './utils/types';
 
 // UIからのメッセージの型定義
-type UiMessage = {
-  type: 'reinspect';
-  inspector: string;
-};
+type UiMessage = { type: 'reinspect'; inspector: string };
+
+function assertNever(x: never): never {
+  throw new Error(`Unhandled message type: ${String(x)}`);
+}
 
 function showUI() {
-  figma.showUI(__html__, { width: 380, height: 460, themeColors: true });
+  figma.showUI(__html__, { width: 360, height: 320, themeColors: true });
 }
 
 function warnUI(message: string) {
@@ -77,10 +78,12 @@ figma.on('run', () => {
 });
 
 figma.ui.onmessage = (msg: UiMessage) => {
-  // ここでUIからのメッセージを受信
-  console.log('[MAIN] onmessage', msg);
-  if (msg.type === 'reinspect') {
-    console.log('[MAIN] reinpect requested', { inspector: msg.inspector });
-    void runInspection(msg.inspector);
+  console.log('[PLUGIN] onmessage', msg?.type);
+  switch (msg.type) {
+    case 'reinspect':
+      void runInspection(msg.inspector);
+      return;
+    default:
+      assertNever(msg as never);
   }
 };

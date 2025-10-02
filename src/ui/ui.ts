@@ -1,19 +1,10 @@
-// 親ウィンドウ参照は window.parent を使用
-// 許可オリジン（Figma Web/デスクトップ/同一オリジン）
-const ALLOWED_ORIGINS = new Set<string>([
-  'https://www.figma.com',
-  'null'
-]);
+// UI側スクリプト（MVP版）：
+// - 検査実行ボタン
+// - KPI（件数）表示のみ
+// - CSV/Markdown等の出力は削除
 
-// 開発・テスト用: 環境変数やビルド時定数から追加
-// @ts-ignore: process.envはビルド時に置換される想定
-if (typeof process !== 'undefined' && process.env && process.env.ALLOWED_ORIGINS) {
-  for (const origin of process.env.ALLOWED_ORIGINS.split(',')) {
-    if (origin) ALLOWED_ORIGINS.add(origin.trim());
-  }
-}
-
-// UI側スクリプト：ダッシュボード表示と出力処理
+// 許可オリジン（Figma Web/デスクトップ/ローカル）
+const ALLOWED_ORIGINS = new Set<string>(['https://www.figma.com', 'null']);
 
 type IssueRow = {
   timestamp: string;
@@ -38,25 +29,12 @@ type Summary = {
   ruleVersions: { JIS: string; WCAG: string };
 };
 
-type ExportPayload = {
-  rows: IssueRow[];
-  summary: Summary;
-  inspector: string;
-};
+type ExportPayload = { rows: IssueRow[]; summary: Summary; inspector: string };
 
 // メインスレッドからのメッセージ型定義
-interface SummaryMessage {
-  type: 'summary';
-  payload: ExportPayload;
-  warning?: string;
-}
-
-interface WarningMessage {
-  type: 'warning';
-  message: string;
-}
-
-type PluginMessage = SummaryMessage | WarningMessage;
+type PluginMessage =
+  | { type: 'summary'; payload: ExportPayload; warning?: string }
+  | { type: 'warning'; message: string };
 
 // 型ガード関数
 const isPluginMessage = (msg: unknown): msg is PluginMessage => {
@@ -70,7 +48,6 @@ const isPluginMessage = (msg: unknown): msg is PluginMessage => {
 
 const $ = <T extends HTMLElement>(sel: string): T | null => document.querySelector(sel);
 
-const inspectorInput = $<HTMLInputElement>('#inspector');
 const kpiCount = $('#kpi-count');
 const kpiErrors = $('#kpi-errors');
 const kpiWarns = $('#kpi-warns');
@@ -78,6 +55,7 @@ const cntContrast = $('#cnt-contrast');
 const cntAlt = $('#cnt-alt');
 const cntTouch = $('#cnt-touch');
 const warningsBox = $('#warnings');
+const listBox = $('#list');
 
 let latestPayload: ExportPayload | null = null;
 
@@ -93,110 +71,6 @@ function download(filename: string, content: string, mime = 'text/plain'): void 
   URL.revokeObjectURL(url);
 }
 
-function escapeCsv(value: string): string {
-  const mustQuote = /[ ",\n]/.test(value);
-  const escaped = value.replace(/"/g, '""');
-  return mustQuote ? `"${escaped}"` : escaped;
-}
-
-function toCsv(rows: IssueRow[]): string {
-  const header =
-    'timestamp,frameName,nodeId,nodeName,issueType,severity,details,suggestedFix,JISClauseId';
-  const body = rows
-    .map((r) =>
-      [
-        r.timestamp,
-        r.frameName,
-        r.nodeId,
-        r.nodeName,
-        r.issueType,
-        r.severity,
-        r.details,
-        r.suggestedFix,
-        r.JISClauseId
-      ]
-        .map((v) => escapeCsv(v))
-        .join(',')
-    )
-    .join('\n');
-  return `${header}\n${body}`;
-}
-
-function now(): { stamp: string; human: string } {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return {
-    stamp: `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(
-      d.getMinutes()
-    )}`,
-    human: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(
-      d.getHours()
-    )}:${pad(d.getMinutes())}`
-  };
-}
-
-function toMarkdown(payload: ExportPayload): string {
-  const { rows, summary, inspector } = payload;
-  const { human } = now();
-
-  const perTypeLines = Object.entries(summary.perType)
-    .map(([k, v]) => `- ${k}: ${v}`)
-    .join('\n');
-
-  const tableHeader =
-    '| timestamp | frameName | nodeId | nodeName | issueType | severity | details | suggestedFix | JISClauseId |\n' +
-    '|---|---|---|---|---|---|---|---|---|';
-
-  const tableBody = rows
-    .map(
-      (r) =>
-        `| ${r.timestamp} | ${r.frameName} | ${r.nodeId} | ${r.nodeName} | ${r.issueType} | ${r.severity} | ${r.details.replaceAll(
-          '|',
-          '\\|'
-        )} | ${r.suggestedFix.replaceAll('|', '\\|')} | ${r.JISClauseId} |`
-    )
-    .join('\n');
-
-  return [
-    '# JIS準拠チェッカーレポート',
-    `- 検査日時: ${human}`,
-    `- 検査者: ${inspector || 'n/a'}`,
-    `- 対象ファイル: ${summary.fileKey || 'n/a'} / ページ: ${summary.pageName || '-'}`,
-    `- JIS/WCAG版: JIS=${summary.ruleVersions.JIS}, WCAG=${summary.ruleVersions.WCAG}`,
-    '',
-    '## 概要',
-    `- 対象フレーム: ${summary.frameName}`,
-    `- 対象ノード数: ${summary.nodeCount}`,
-    `- 検出件数: error=${summary.errorCount}, warning=${summary.warnCount}`,
-    '',
-    '## 件数サマリ（issueType別）',
-    perTypeLines || '- なし',
-    '',
-    '## 違反表',
-    tableHeader,
-    tableBody || '| なし |  |  |  |  |  |  |  |  |',
-    '',
-    '## 検査環境',
-    `- Figmaバージョン: n/a`,
-    `- プラグイン: JIS準拠チェッカー v0.1`
-  ].join('\n');
-}
-
-function toAuditLog(payload: ExportPayload): { filename: string; json: string } {
-  const { stamp } = now();
-  const { summary, inspector } = payload;
-  const runId = `run_${stamp}_${Math.random().toString(36).slice(2, 8)}`;
-  const log = {
-    runId,
-    inspector: inspector || 'n/a',
-    fileKey: summary.fileKey || null,
-    pageName: summary.pageName || null,
-    frameName: summary.frameName,
-    nodeCount: summary.nodeCount,
-    ruleVersions: summary.ruleVersions
-  };
-  return { filename: `exports/audit_log_${stamp}.json`, json: JSON.stringify(log, null, 2) };
-}
 
 function updateKpis(payload: ExportPayload): void {
   latestPayload = payload;
@@ -206,6 +80,7 @@ function updateKpis(payload: ExportPayload): void {
   if (cntContrast) cntContrast.textContent = String(payload.summary.perType['contrast'] || 0);
   if (cntAlt) cntAlt.textContent = String(payload.summary.perType['altText'] || 0);
   if (cntTouch) cntTouch.textContent = String(payload.summary.perType['touchTarget'] || 0);
+  renderList(payload.rows);
 }
 
 // 受信メッセージの安全性を確保（オリジン/ペイロード検証）
@@ -243,27 +118,74 @@ window.addEventListener('message', (e: MessageEvent) => {
 const btnRun = $('#btn-run');
 if (btnRun) {
   btnRun.addEventListener('click', () => {
-    if (inspectorInput) {
-      const name = inspectorInput.value.trim();
-      console.log('[UI] reinpect click', { inspector: name });
-      // 親ウィンドウのオリジンを取得し、明示的に指定
-      let parentOrigin: string | undefined;
-      try {
-        if (document.referrer) {
-          parentOrigin = new URL(document.referrer).origin;
-        }
-      } catch (e) {
-        parentOrigin = undefined;
-      }
-      // 許可リストで検証
-      const allowedOrigins = ['https://www.figma.com'];
-      if (parentOrigin && allowedOrigins.some(o => parentOrigin === o || parentOrigin.startsWith('chrome-extension://'))) {
-        window.parent.postMessage({ pluginMessage: { type: 'reinspect', inspector: name } }, parentOrigin);
-      } else {
-        console.warn('[UI] postMessage送信先オリジンが許可されていません:', parentOrigin);
-      }
-    }
+    window.parent.postMessage({ pluginMessage: { type: 'reinspect', inspector: '' } }, '*');
   });
+}
+
+// --- 明細レンダリング（最小） ---
+function escapeHtml(s: string): string {
+  return s
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function renderList(rows: IssueRow[]): void {
+  if (!listBox) return;
+  if (!rows || rows.length === 0) {
+    listBox.innerHTML = '<div class="muted">検出なし</div>';
+    return;
+  }
+  const head =
+    '<div style="display:grid;grid-template-columns:70px 80px 1fr 70px 60px;gap:6px;margin-bottom:6px;" class="muted">' +
+    '<div>type</div><div>severity</div><div>details</div><div>node</div><div>JIS</div></div>';
+  const body = rows
+    .map((r) => {
+      const type = escapeHtml(r.issueType);
+      const sev = escapeHtml(r.severity);
+      const det = escapeHtml(r.details);
+      const node = escapeHtml(r.nodeName);
+      const jis = escapeHtml(r.JISClauseId);
+      return (
+        '<div style="display:grid;grid-template-columns:70px 80px 1fr 70px 60px;gap:6px;margin:4px 0;">' +
+        `<div>${type}</div><div class="${sev === 'error' ? 'err' : 'warn'}">${sev}</div>` +
+        `<div title="${det}">${det}</div><div title="${node}">${node}</div><div title="${jis}">${jis}</div>` +
+        '</div>'
+      );
+    })
+    .join('');
+  listBox.innerHTML = head + body;
+}
+
+// --- CSV 出力（最小） ---
+function escapeCsv(value: string): string {
+  const mustQuote = /[",\n]/.test(value);
+  const escaped = value.replace(/"/g, '""');
+  return mustQuote ? `"${escaped}"` : escaped;
+}
+
+function toCsv(rows: IssueRow[]): string {
+  const header = 'timestamp,frameName,nodeId,nodeName,issueType,severity,details,suggestedFix,JISClauseId';
+  const body = rows
+    .map((r) =>
+      [
+        r.timestamp,
+        r.frameName,
+        r.nodeId,
+        r.nodeName,
+        r.issueType,
+        r.severity,
+        r.details,
+        r.suggestedFix,
+        r.JISClauseId
+      ]
+        .map((v) => escapeCsv(v))
+        .join(',')
+    )
+    .join('\n');
+  return `${header}\n${body}`;
 }
 
 const btnCsv = $('#btn-csv');
@@ -271,40 +193,8 @@ if (btnCsv) {
   btnCsv.addEventListener('click', () => {
     const payload = latestPayload;
     if (!payload) return;
-    const { stamp } = now();
     const csv = toCsv(payload.rows);
-    download(`exports/jis_checker_report_${stamp}.csv`, csv, 'text/csv');
-  });
-}
-
-const btnMd = $('#btn-md');
-if (btnMd) {
-  btnMd.addEventListener('click', () => {
-    const payload = latestPayload;
-    if (!payload || !inspectorInput) return;
-    const { stamp } = now();
-    const md = toMarkdown({ ...payload, inspector: inspectorInput.value.trim() });
-    download(`exports/jis_checker_report_${stamp}.md`, md, 'text/markdown');
-  });
-}
-
-const btnAudit = $('#btn-audit');
-if (btnAudit) {
-  btnAudit.addEventListener('click', () => {
-    const payload = latestPayload;
-    if (!payload || !inspectorInput) return;
-    const { filename, json } = toAuditLog({
-      ...payload,
-      inspector: inspectorInput.value.trim()
-    });
-    download(filename, json, 'application/json');
-  });
-}
-
-const linkClause = $('#link-clause');
-if (linkClause) {
-  linkClause.addEventListener('click', (e) => {
-    e.preventDefault();
-    window.open('https://www.w3.org/TR/WCAG21/', '_blank', 'noreferrer');
+    const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, '').replace('-', '');
+    download(`jis_checker_${stamp}.csv`, csv, 'text/csv');
   });
 }

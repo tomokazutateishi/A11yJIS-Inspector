@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "tmp_tests",
+    "types": ["node", "@figma/plugin-typings"]
+  },
+  "include": [
+    "tests/**/*.ts",
+    "src/utils/color.ts",
+    "src/utils/ruleEngine.ts",
+    "src/utils/types.ts"
+  ]
+}
+

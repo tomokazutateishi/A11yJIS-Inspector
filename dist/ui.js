@@ -1,9 +1,5 @@
 // src/ui/ui.ts
-var ALLOWED_ORIGINS = /* @__PURE__ */ new Set([
-  "https://www.figma.com",
-  "null",
-  window.location.origin
-]);
+var ALLOWED_ORIGINS = /* @__PURE__ */ new Set(["https://www.figma.com", "null"]);
 var isPluginMessage = (msg) => {
   if (!msg || typeof msg !== "object") return false;
   if (!("type" in msg) || typeof msg.type !== "string") {
@@ -13,7 +9,6 @@ var isPluginMessage = (msg) => {
   return type === "summary" || type === "warning";
 };
 var $ = (sel) => document.querySelector(sel);
-var inspectorInput = $("#inspector");
 var kpiCount = $("#kpi-count");
 var kpiErrors = $("#kpi-errors");
 var kpiWarns = $("#kpi-warns");
@@ -21,6 +16,7 @@ var cntContrast = $("#cnt-contrast");
 var cntAlt = $("#cnt-alt");
 var cntTouch = $("#cnt-touch");
 var warningsBox = $("#warnings");
+var listBox = $("#list");
 var latestPayload = null;
 function download(filename, content, mime = "text/plain") {
   const blob = new Blob([content], { type: mime });
@@ -33,91 +29,6 @@ function download(filename, content, mime = "text/plain") {
   a.remove();
   URL.revokeObjectURL(url);
 }
-function escapeCsv(value) {
-  const mustQuote = /[ ",\n]/.test(value);
-  const escaped = value.replace(/"/g, '""');
-  return mustQuote ? `"${escaped}"` : escaped;
-}
-function toCsv(rows) {
-  const header = "timestamp,frameName,nodeId,nodeName,issueType,severity,details,suggestedFix,JISClauseId";
-  const body = rows.map(
-    (r) => [
-      r.timestamp,
-      r.frameName,
-      r.nodeId,
-      r.nodeName,
-      r.issueType,
-      r.severity,
-      r.details,
-      r.suggestedFix,
-      r.JISClauseId
-    ].map((v) => escapeCsv(v)).join(",")
-  ).join("\n");
-  return `${header}
-${body}`;
-}
-function now() {
-  const d = /* @__PURE__ */ new Date();
-  const pad = (n) => String(n).padStart(2, "0");
-  return {
-    stamp: `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(
-      d.getMinutes()
-    )}`,
-    human: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(
-      d.getHours()
-    )}:${pad(d.getMinutes())}`
-  };
-}
-function toMarkdown(payload) {
-  const { rows, summary, inspector } = payload;
-  const { human } = now();
-  const perTypeLines = Object.entries(summary.perType).map(([k, v]) => `- ${k}: ${v}`).join("\n");
-  const tableHeader = "| timestamp | frameName | nodeId | nodeName | issueType | severity | details | suggestedFix | JISClauseId |\n|---|---|---|---|---|---|---|---|---|";
-  const tableBody = rows.map(
-    (r) => `| ${r.timestamp} | ${r.frameName} | ${r.nodeId} | ${r.nodeName} | ${r.issueType} | ${r.severity} | ${r.details.replaceAll(
-      "|",
-      "\\|"
-    )} | ${r.suggestedFix.replaceAll("|", "\\|")} | ${r.JISClauseId} |`
-  ).join("\n");
-  return [
-    "# JIS\u6E96\u62E0\u30C1\u30A7\u30C3\u30AB\u30FC\u30EC\u30DD\u30FC\u30C8",
-    `- \u691C\u67FB\u65E5\u6642: ${human}`,
-    `- \u691C\u67FB\u8005: ${inspector || "n/a"}`,
-    `- \u5BFE\u8C61\u30D5\u30A1\u30A4\u30EB: ${summary.fileKey || "n/a"} / \u30DA\u30FC\u30B8: ${summary.pageName || "-"}`,
-    `- JIS/WCAG\u7248: JIS=${summary.ruleVersions.JIS}, WCAG=${summary.ruleVersions.WCAG}`,
-    "",
-    "## \u6982\u8981",
-    `- \u5BFE\u8C61\u30D5\u30EC\u30FC\u30E0: ${summary.frameName}`,
-    `- \u5BFE\u8C61\u30CE\u30FC\u30C9\u6570: ${summary.nodeCount}`,
-    `- \u691C\u51FA\u4EF6\u6570: error=${summary.errorCount}, warning=${summary.warnCount}`,
-    "",
-    "## \u4EF6\u6570\u30B5\u30DE\u30EA\uFF08issueType\u5225\uFF09",
-    perTypeLines || "- \u306A\u3057",
-    "",
-    "## \u9055\u53CD\u8868",
-    tableHeader,
-    tableBody || "| \u306A\u3057 |  |  |  |  |  |  |  |  |",
-    "",
-    "## \u691C\u67FB\u74B0\u5883",
-    `- Figma\u30D0\u30FC\u30B8\u30E7\u30F3: n/a`,
-    `- \u30D7\u30E9\u30B0\u30A4\u30F3: JIS\u6E96\u62E0\u30C1\u30A7\u30C3\u30AB\u30FC v0.1`
-  ].join("\n");
-}
-function toAuditLog(payload) {
-  const { stamp } = now();
-  const { summary, inspector } = payload;
-  const runId = `run_${stamp}_${Math.random().toString(36).slice(2, 8)}`;
-  const log = {
-    runId,
-    inspector: inspector || "n/a",
-    fileKey: summary.fileKey || null,
-    pageName: summary.pageName || null,
-    frameName: summary.frameName,
-    nodeCount: summary.nodeCount,
-    ruleVersions: summary.ruleVersions
-  };
-  return { filename: `exports/audit_log_${stamp}.json`, json: JSON.stringify(log, null, 2) };
-}
 function updateKpis(payload) {
   latestPayload = payload;
   if (kpiCount) kpiCount.textContent = String(payload.summary.nodeCount);
@@ -126,6 +37,7 @@ function updateKpis(payload) {
   if (cntContrast) cntContrast.textContent = String(payload.summary.perType["contrast"] || 0);
   if (cntAlt) cntAlt.textContent = String(payload.summary.perType["altText"] || 0);
   if (cntTouch) cntTouch.textContent = String(payload.summary.perType["touchTarget"] || 0);
+  renderList(payload.rows);
 }
 window.addEventListener("message", (e) => {
   try {
@@ -156,50 +68,60 @@ window.addEventListener("message", (e) => {
 var btnRun = $("#btn-run");
 if (btnRun) {
   btnRun.addEventListener("click", () => {
-    if (inspectorInput) {
-      const name = inspectorInput.value.trim();
-      console.log("[UI] reinpect click", { inspector: name });
-      window.parent.postMessage({ pluginMessage: { type: "reinspect", inspector: name } }, "*");
-    }
+    window.parent.postMessage({ pluginMessage: { type: "reinspect", inspector: "" } }, "*");
   });
+}
+function escapeHtml(s) {
+  return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#39;");
+}
+function renderList(rows) {
+  if (!listBox) return;
+  if (!rows || rows.length === 0) {
+    listBox.innerHTML = '<div class="muted">\u691C\u51FA\u306A\u3057</div>';
+    return;
+  }
+  const head = '<div style="display:grid;grid-template-columns:70px 80px 1fr 70px 60px;gap:6px;margin-bottom:6px;" class="muted"><div>type</div><div>severity</div><div>details</div><div>node</div><div>JIS</div></div>';
+  const body = rows.map((r) => {
+    const type = escapeHtml(r.issueType);
+    const sev = escapeHtml(r.severity);
+    const det = escapeHtml(r.details);
+    const node = escapeHtml(r.nodeName);
+    const jis = escapeHtml(r.JISClauseId);
+    return `<div style="display:grid;grid-template-columns:70px 80px 1fr 70px 60px;gap:6px;margin:4px 0;"><div>${type}</div><div class="${sev === "error" ? "err" : "warn"}">${sev}</div><div title="${det}">${det}</div><div title="${node}">${node}</div><div title="${jis}">${jis}</div></div>`;
+  }).join("");
+  listBox.innerHTML = head + body;
+}
+function escapeCsv(value) {
+  const mustQuote = /[",\n]/.test(value);
+  const escaped = value.replace(/"/g, '""');
+  return mustQuote ? `"${escaped}"` : escaped;
+}
+function toCsv(rows) {
+  const header = "timestamp,frameName,nodeId,nodeName,issueType,severity,details,suggestedFix,JISClauseId";
+  const body = rows.map(
+    (r) => [
+      r.timestamp,
+      r.frameName,
+      r.nodeId,
+      r.nodeName,
+      r.issueType,
+      r.severity,
+      r.details,
+      r.suggestedFix,
+      r.JISClauseId
+    ].map((v) => escapeCsv(v)).join(",")
+  ).join("\n");
+  return `${header}
+${body}`;
 }
 var btnCsv = $("#btn-csv");
 if (btnCsv) {
   btnCsv.addEventListener("click", () => {
     const payload = latestPayload;
     if (!payload) return;
-    const { stamp } = now();
     const csv = toCsv(payload.rows);
-    download(`exports/jis_checker_report_${stamp}.csv`, csv, "text/csv");
-  });
-}
-var btnMd = $("#btn-md");
-if (btnMd) {
-  btnMd.addEventListener("click", () => {
-    const payload = latestPayload;
-    if (!payload || !inspectorInput) return;
-    const { stamp } = now();
-    const md = toMarkdown({ ...payload, inspector: inspectorInput.value.trim() });
-    download(`exports/jis_checker_report_${stamp}.md`, md, "text/markdown");
-  });
-}
-var btnAudit = $("#btn-audit");
-if (btnAudit) {
-  btnAudit.addEventListener("click", () => {
-    const payload = latestPayload;
-    if (!payload || !inspectorInput) return;
-    const { filename, json } = toAuditLog({
-      ...payload,
-      inspector: inspectorInput.value.trim()
-    });
-    download(filename, json, "application/json");
-  });
-}
-var linkClause = $("#link-clause");
-if (linkClause) {
-  linkClause.addEventListener("click", (e) => {
-    e.preventDefault();
-    window.open("https://www.w3.org/TR/WCAG21/", "_blank", "noreferrer");
+    const stamp = (/* @__PURE__ */ new Date()).toISOString().slice(0, 16).replace(/[:T]/g, "").replace("-", "");
+    download(`jis_checker_${stamp}.csv`, csv, "text/csv");
   });
 }
 //# sourceMappingURL=ui.js.map

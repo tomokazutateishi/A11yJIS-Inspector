@@ -4,39 +4,111 @@
   var jis_mapping_default = {
     contrast: "JIS8341-3: WCAG 1.4.3 / 1.4.11 \u6E96\u62E0\uFF08AA\uFF09",
     altText: "JIS8341-3: 1.1.1 \u975E\u30C6\u30AD\u30B9\u30C8\u30B3\u30F3\u30C6\u30F3\u30C4",
-    touchTarget: "JIS8341-3: 2.5.5 \u30BF\u30FC\u30B2\u30C3\u30C8\u306E\u30B5\u30A4\u30BA\uFF08\u53C2\u8003\uFF09/ JIS\u9644\u5C5E\u66F8 \u56FD\u5185\u904B\u7528\u6CE8\u8A18\uFF08\u30C0\u30DF\u30FC\uFF09",
+    touchTarget: "JIS8341-3: 2.5.5 \u30BF\u30FC\u30B2\u30C3\u30C8\u306E\u30B5\u30A4\u30BA\uFF08\u53C2\u8003\uFF09/ JIS\u9644\u5C5E\u66F8 \u56FD\u5185\u904B\u7528\u6CE8\u8A18",
     meta: {
-      jisVersion: "JIS X 8341-3:2016\uFF08\u30C0\u30DF\u30FC\uFF09",
-      wcagVersion: "WCAG 2.1\uFF08\u30C0\u30DF\u30FC\uFF09"
+      jisVersion: "JIS X 8341-3:2016",
+      wcagVersion: "WCAG 2.1"
     }
   };
+
+  // src/utils/color.ts
+  function relativeLuminance(rgb) {
+    const srgb = [rgb.r, rgb.g, rgb.b].map((v) => {
+      const c = clamp01(v);
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
+  }
+  function contrastRatio(fg, bg) {
+    const L1 = relativeLuminance(fg);
+    const L2 = relativeLuminance(bg);
+    const [a, b] = L1 > L2 ? [L1, L2] : [L2, L1];
+    return (a + 0.05) / (b + 0.05);
+  }
+  function clamp01(v) {
+    return Math.max(0, Math.min(1, v));
+  }
+  function solidPaintToRGB(paint) {
+    var _a;
+    if (paint.type !== "SOLID" || paint.visible === false) return null;
+    const { r, g, b } = paint.color;
+    const opacity = (_a = paint.opacity) != null ? _a : 1;
+    return { r: r * opacity + (1 - opacity), g: g * opacity + (1 - opacity), b: b * opacity + (1 - opacity) };
+  }
+  function firstSolidFromFills(node) {
+    if ("fills" in node) {
+      const fills = node.fills;
+      if (fills === figma.mixed || !fills || !Array.isArray(fills)) return null;
+      const solidPaint = fills.find(
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        (p) => p.type === "SOLID" && p.visible !== false
+      );
+      if (solidPaint) {
+        return solidPaintToRGB(solidPaint);
+      }
+    }
+    return null;
+  }
+  function hasFills(node) {
+    return "fills" in node;
+  }
+  function estimateBackgroundRGB(node) {
+    let current = node.parent;
+    while (current && current.type !== "PAGE") {
+      if (hasFills(current)) {
+        const fills = current.fills;
+        if (fills !== figma.mixed && Array.isArray(fills)) {
+          const solidPaint = fills.find(
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+            (p) => p.type === "SOLID" && p.visible !== false
+          );
+          if (solidPaint) {
+            const rgb = solidPaintToRGB(solidPaint);
+            if (rgb) return { rgb, source: `parent:${current.name}` };
+          }
+        }
+      }
+      current = current.parent;
+    }
+    return { rgb: { r: 1, g: 1, b: 1 }, source: "default:white" };
+  }
 
   // src/utils/ruleEngine.ts
   function isTextNode(n) {
     return n.type === "TEXT";
   }
-  function isComponentOrSet(n) {
-    return n.type === "COMPONENT" || n.type === "COMPONENT_SET";
-  }
   function getNodeDescriptionSafe(node) {
-    var _a, _b;
-    if (isComponentOrSet(node)) {
-      return (_a = node.description) != null ? _a : void 0;
+    var _a;
+    const nativeDesc = (() => {
+      const maybeObj = node;
+      if (maybeObj && typeof maybeObj === "object") {
+        const val = maybeObj["description"];
+        if (typeof val === "string") {
+          const trimmed = val.trim();
+          if (trimmed.length > 0) return trimmed;
+        }
+      }
+      return void 0;
+    })();
+    if (nativeDesc) return nativeDesc;
+    const pd = (_a = node.getPluginData) == null ? void 0 : _a.call(node, "description");
+    if (typeof pd === "string") {
+      const trimmed = pd.trim();
+      if (trimmed.length > 0) return trimmed;
     }
-    const pd = (_b = node.getPluginData) == null ? void 0 : _b.call(node, "description");
-    return pd || void 0;
+    return void 0;
   }
   function ts() {
     return (/* @__PURE__ */ new Date()).toISOString();
   }
-  function hasFills(node) {
+  function hasFills2(node) {
     return "fills" in node;
   }
   function isLayoutable(node) {
     return "width" in node && "height" in node;
   }
   function isImageLike(node) {
-    if (hasFills(node)) {
+    if (hasFills2(node)) {
       const fills = node.fills;
       if (fills && fills !== figma.mixed && Array.isArray(fills)) {
         return fills.some((p) => p.type === "IMAGE");
@@ -69,7 +141,7 @@
     return 4.5;
   }
   function checkContrast(node, frameName, map) {
-    if (!hasFills(node) && !isTextNode(node)) return null;
+    if (!hasFills2(node) && !isTextNode(node)) return null;
     const fg = firstSolidFromFills(node);
     const bgEst = estimateBackgroundRGB(node);
     if (!fg) {
@@ -189,8 +261,11 @@
   }
 
   // src/code.ts
+  function assertNever(x) {
+    throw new Error(`Unhandled message type: ${String(x)}`);
+  }
   function showUI() {
-    figma.showUI(__html__, { width: 380, height: 460, themeColors: true });
+    figma.showUI(__html__, { width: 360, height: 320, themeColors: true });
   }
   function warnUI(message) {
     figma.ui.postMessage({ type: "warning", message });
@@ -236,10 +311,13 @@
     void runInspection();
   });
   figma.ui.onmessage = (msg) => {
-    console.log("[MAIN] onmessage", msg);
-    if (msg.type === "reinspect") {
-      console.log("[MAIN] reinpect requested", { inspector: msg.inspector });
-      void runInspection(msg.inspector);
+    console.log("[PLUGIN] onmessage", msg == null ? void 0 : msg.type);
+    switch (msg.type) {
+      case "reinspect":
+        void runInspection(msg.inspector);
+        return;
+      default:
+        assertNever(msg);
     }
   };
 })();

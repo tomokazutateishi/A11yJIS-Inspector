@@ -9,6 +9,7 @@
     "watch:code": "esbuild src/code.ts --bundle --target=es2018 --outfile=dist/code.js --loader:.json=json --watch",
     "watch:ui": "esbuild src/ui/ui.ts --bundle --target=es2018 --outfile=dist/ui.js --format=esm --sourcemap --watch",
     "lint": "eslint . --ext .ts,.tsx,.js",
+    "test": "tsc -p tsconfig.tests.json && node tmp_tests/tests/run.js",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md,html}\""
   },
   "devDependencies": {

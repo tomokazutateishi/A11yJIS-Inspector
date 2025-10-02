@@ -6,7 +6,8 @@
  * 例外はクラッシュさせず、warningとして報告します。
  */
 
-import { firstSolidFromFills, estimateBackgroundRGB, contrastRatio } from './color';
+import { contrastRatio, estimateBackgroundRGB, firstSolidFromFills } from './color.js';
+import type { AnalyzeResult, IssueRow, JISMapping } from './types';
 
 function isTextNode(n: SceneNode): n is TextNode {
   return n.type === 'TEXT';
@@ -36,7 +37,6 @@ export function getNodeDescriptionSafe(node: SceneNode): string | undefined {
   }
   return undefined;
 }
-import type { AnalyzeResult, IssueRow, JISMapping } from './types';
 
 function ts(): string {
   return new Date().toISOString();
